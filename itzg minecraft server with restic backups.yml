@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  minecraft:
+    image: itzg/minecraft-server
+    volumes:
+      - /home/minecraft/data:/data
+      - /home/minecraft/plugins:/plugins
+      - /home/minecraft/mods:/mods
+    ports:
+      - 25565:25565
+    environment:
+      TZ: "America/Chicago"
+      LOG_TIMESTAMP: "TRUE"
+      OVERRIDE_SERVER_PROPERTIES: "FALSE"
+      EULA: "TRUE"
+      TYPE: "PAPER"
+      OPS: <USERNAME>
+      ENABLE_WHITELIST: "TRUE"
+      ENFORCE_WHITELIST: "TRUE"
+      USE_AIKAR_FLAGS: "TRUE"
+      MEMORY: "16G"
+    tty: true
+    stdin_open: true
+    restart: unless-stopped
+    
+  mc-backup:
+    image: itzg/mc-backup
+    depends_on:
+      minecraft:
+        condition: service_healthy
+    environment:
+      TZ: "America/Chicago"
+      BACKUP_INTERVAL: "24h"
+      PAUSE_IF_NO_PLAYERS: "TRUE"
+      RCON_HOST: minecraft
+      RCON_PASSWORD: <PASSWORD GOES HERE>
+      INITIAL_DELAY: 0
+      BACKUP_METHOD: restic
+      RESTIC_PASSWORD: <PASSWORD GOES HERE>
+      RESTIC_REPOSITORY: /restic-repo
+      RESTIC_ADDITIONAL_TAGS: mc-backups
+      PRUNE_RESTIC_RETENTION: "--keep-daily 3 --keep-weekly 4 --keep-monthly 12 --keep-yearly 75"
+      PRE_BACKUP_SCRIPT: |
+        echo "Before backup!"
+      POST_BACKUP_SCRIPT: |
+        echo "Backup complete! surely..."
+    volumes:
+      - /home/minecraft/data:/data:ro
+      - /home/restic-repo:/restic-repo
