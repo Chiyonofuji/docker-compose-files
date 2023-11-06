@@ -15,14 +15,14 @@ services:
       OVERRIDE_SERVER_PROPERTIES: "FALSE"
       EULA: "TRUE"
       TYPE: "PAPER"
-      OPS: <USERNAME>
+      OPS: <>
       ENABLE_WHITELIST: "TRUE"
       ENFORCE_WHITELIST: "TRUE"
       USE_AIKAR_FLAGS: "TRUE"
-      MEMORY: "16G"
+      MEMORY: "22G"
     tty: true
     stdin_open: true
-    restart: unless-stopped
+    restart: on-failure
     
   mc-backup:
     image: itzg/mc-backup
@@ -34,10 +34,10 @@ services:
       BACKUP_INTERVAL: "24h"
       PAUSE_IF_NO_PLAYERS: "TRUE"
       RCON_HOST: minecraft
-      RCON_PASSWORD: <PASSWORD GOES HERE>
+      RCON_PASSWORD: <>
       INITIAL_DELAY: 0
       BACKUP_METHOD: restic
-      RESTIC_PASSWORD: <PASSWORD GOES HERE>
+      RESTIC_PASSWORD: <>
       RESTIC_REPOSITORY: /restic-repo
       RESTIC_ADDITIONAL_TAGS: mc-backups
       PRUNE_RESTIC_RETENTION: "--keep-daily 3 --keep-weekly 4 --keep-monthly 12 --keep-yearly 75"
@@ -45,6 +45,29 @@ services:
         echo "Before backup!"
       POST_BACKUP_SCRIPT: |
         echo "Backup complete! surely..."
+      restart: unless-stopped
     volumes:
       - /home/minecraft/data:/data:ro
       - /home/restic-repo:/restic-repo
+
+  restarter:
+    image: docker:cli
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+    entrypoint: ["/bin/sh","-c"]
+    command:
+      - |
+        while true; do
+          if [ "$(date +'%H:%M')" = '10:00' ]; then
+            docker exec mc-server-minecraft-1 mc-send-to-console "say Server will restart in 5 minutes!"
+            echo "RESTARTER: shutdown message sent"
+            echo "RESTARTER: restarting in 5 minutes"
+            sleep 300
+            docker exec mc-server-minecraft-1 mc-send-to-console stop
+            echo "RESTARTER: stopping server"
+            sleep 20
+            docker restart mc-server-minecraft-1
+            echo "RESTARTER: container restarted"
+          fi
+          sleep 60
+        done
+    restart: unless-stopped
