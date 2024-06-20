@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   minecraft:
     image: itzg/minecraft-server
@@ -7,10 +5,12 @@ services:
       - /home/minecraft/data:/data
       - /home/minecraft/plugins:/plugins
       - /home/minecraft/mods:/mods
+      - /home/minecraft/vanillatweaks-datapacks.json:/config/vanillatweaks-datapacks.json:ro
+      - /home/minecraft/vanillatweaks-craftingtweaks.json:/config/vanillatweaks-craftingtweaks.json:ro
     ports:
       - 25565:25565
     environment:
-      TZ: "America/Chicago"
+      TZ: <>
       LOG_TIMESTAMP: "TRUE"
       OVERRIDE_SERVER_PROPERTIES: "FALSE"
       EULA: "TRUE"
@@ -18,11 +18,17 @@ services:
       OPS: <>
       ENABLE_WHITELIST: "TRUE"
       ENFORCE_WHITELIST: "TRUE"
+      CREATE_CONSOLE_IN_PIPE: "TRUE"
+      RCON_PASSWORD: <>
+      
       USE_AIKAR_FLAGS: "TRUE"
-      MEMORY: "22G"
+      MEMORY: <>
+      
+      VANILLATWEAKS_FILE: /config/vanillatweaks-datapacks.json,/config/vanillatweaks-craftingtweaks.json
+      
     tty: true
     stdin_open: true
-    restart: on-failure
+    restart: unless-stopped
     
   mc-backup:
     image: itzg/mc-backup
@@ -30,22 +36,32 @@ services:
       minecraft:
         condition: service_healthy
     environment:
-      TZ: "America/Chicago"
+    
+      RESTIC_HOSTNAME: "Backup Service"
+      TZ: <>
+
       BACKUP_INTERVAL: "24h"
       PAUSE_IF_NO_PLAYERS: "TRUE"
+      PLAYERS_ONLINE_CHECK_INTERVAL: "5m"
+      
       RCON_HOST: minecraft
       RCON_PASSWORD: <>
-      INITIAL_DELAY: 0
+      INITIAL_DELAY: 60
+      RCON_RETRIES: 5
+      RCON_RETRY_INTERVAL: "60s"
+      
       BACKUP_METHOD: restic
       RESTIC_PASSWORD: <>
       RESTIC_REPOSITORY: /restic-repo
       RESTIC_ADDITIONAL_TAGS: mc-backups
       PRUNE_RESTIC_RETENTION: "--keep-daily 3 --keep-weekly 4 --keep-monthly 12 --keep-yearly 75"
+      
       PRE_BACKUP_SCRIPT: |
         echo "Before backup!"
       POST_BACKUP_SCRIPT: |
         echo "Backup complete! surely..."
       restart: unless-stopped
+      
     volumes:
       - /home/minecraft/data:/data:ro
       - /home/restic-repo:/restic-repo
@@ -58,15 +74,14 @@ services:
       - |
         while true; do
           if [ "$(date +'%H:%M')" = '10:00' ]; then
-            docker exec mc-server-minecraft-1 mc-send-to-console "say Server will restart in 5 minutes!"
+            docker exec mc-server-minecraft-1 rcon-cli "say Server will restart in 5 minutes!"
             echo "RESTARTER: shutdown message sent"
             echo "RESTARTER: restarting in 5 minutes"
             sleep 300
-            docker exec mc-server-minecraft-1 mc-send-to-console stop
-            echo "RESTARTER: stopping server"
-            sleep 20
-            docker restart mc-server-minecraft-1
-            echo "RESTARTER: container restarted"
+            docker exec mc-server-minecraft-1 rcon-cli "say Server will restart now"
+            sleep 10
+            docker exec mc-server-minecraft-1 rcon-cli stop
+            echo "RESTARTER: server stopped"
           fi
           sleep 60
         done
