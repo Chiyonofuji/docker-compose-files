@@ -1,0 +1,23 @@
+{
+    "type": "datapacks",
+    "version": "1.21",
+    "packs": {
+        "decorative/cosmetic": ["silence mobs"],
+        "convenience": [
+            "double shulker shells",
+            "multiplayer sleep",
+            "unlock all recipes"
+        ],
+        "gameplay changes": [
+            "armored elytra",
+            "bat membranes",
+            "silk touch budding amethyst"
+        ],
+        "teleport commands": [
+            "homes",
+            "tpa",
+            "back"
+        ]
+    },
+    "result": "ok"
+}
