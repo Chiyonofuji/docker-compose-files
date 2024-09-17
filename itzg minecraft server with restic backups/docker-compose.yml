@@ -2,23 +2,25 @@ services:
   minecraft:
     image: itzg/minecraft-server
     volumes:
-      - /home/minecraft/data:/data
+      - /home/minecraft/data:/data # We don't want to generate a new world, we have our own that we will use.
       - /home/minecraft/plugins:/plugins
       - /home/minecraft/mods:/mods
-      - /home/minecraft/vanillatweaks-datapacks.json:/config/vanillatweaks-datapacks.json:ro
+      - /home/minecraft/vanillatweaks-datapacks.json:/config/vanillatweaks-datapacks.json:ro # These can be mounted as read only as we don't need write access.
       - /home/minecraft/vanillatweaks-craftingtweaks.json:/config/vanillatweaks-craftingtweaks.json:ro
     ports:
       - 25565:25565
     environment:
       TZ: <>
       LOG_TIMESTAMP: "TRUE"
-      OVERRIDE_SERVER_PROPERTIES: "FALSE"
+      OVERRIDE_SERVER_PROPERTIES: "FALSE" # Because I have my own world, I have my own server.properties file and I do not want that overwritten.
       EULA: "TRUE"
       TYPE: "PAPER"
+      PAPER_CHANNEL: "RELEASE" # Can change to EXPERIMENTAL if the release version is taking a while to be released.
+      VERSION: "1.21.1"
       OPS: <>
       ENABLE_WHITELIST: "TRUE"
       ENFORCE_WHITELIST: "TRUE"
-      CREATE_CONSOLE_IN_PIPE: "TRUE"
+      CREATE_CONSOLE_IN_PIPE: "TRUE" # This is needed for the pipes used in mc-backup PRE and POST_BACKUP_SCRIPT.
       RCON_PASSWORD: <>
       
       USE_AIKAR_FLAGS: "TRUE"
@@ -34,25 +36,25 @@ services:
     image: itzg/mc-backup
     depends_on:
       minecraft:
-        condition: service_healthy
+        condition: service_healthy # We want to make sure that the server itself is healthy before the backup service runs.
+    volumes:
+      - /home/minecraft/data:/data:ro # Mount the world as read only as we do not want to give write access.
+      - /home/restic-repo:/restic-repo
     environment:
-    
-      RESTIC_HOSTNAME: "Backup Service"
       TZ: <>
-
-      BACKUP_INTERVAL: "24h"
-      PAUSE_IF_NO_PLAYERS: "TRUE"
-      PLAYERS_ONLINE_CHECK_INTERVAL: "5m"
-      
       RCON_HOST: minecraft
       RCON_PASSWORD: <>
-      INITIAL_DELAY: 60
+      INITIAL_DELAY: 30 # Delay to give time for the server to come up before the backup service tries to do anything.
       RCON_RETRIES: 5
-      RCON_RETRY_INTERVAL: "60s"
+      RCON_RETRY_INTERVAL: "10s"
       
       BACKUP_METHOD: restic
-      RESTIC_PASSWORD: <>
+      RESTIC_HOSTNAME: "Backup Service" # It's important to name give a hostname or else each restart will create a different host.
       RESTIC_REPOSITORY: /restic-repo
+      RESTIC_PASSWORD: <>
+      BACKUP_INTERVAL: "24h"
+      PAUSE_IF_NO_PLAYERS: "TRUE"
+      PLAYERS_ONLINE_CHECK_INTERVAL: "5m" # Don't backup if there's no players and check for players every 5 minutes.
       RESTIC_ADDITIONAL_TAGS: mc-backups
       PRUNE_RESTIC_RETENTION: "--keep-daily 3 --keep-weekly 4 --keep-monthly 12 --keep-yearly 75"
       
@@ -60,17 +62,13 @@ services:
         echo "Before backup!"
       POST_BACKUP_SCRIPT: |
         echo "Backup complete! surely..."
-      restart: unless-stopped
-      
-    volumes:
-      - /home/minecraft/data:/data:ro
-      - /home/restic-repo:/restic-repo
+    restart: unless-stopped
 
   restarter:
     image: docker:cli
     volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
     entrypoint: ["/bin/sh","-c"]
-    command:
+    command: # at 10:00 UTC send a 5 minute warning to players. Then send the stop signal to the server.
       - |
         while true; do
           if [ "$(date +'%H:%M')" = '10:00' ]; then
